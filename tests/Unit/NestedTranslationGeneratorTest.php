@@ -397,6 +397,69 @@ class NestedTranslationGeneratorTest extends TestCase
     }
 
     #[Test]
+    public function it_creates_lang_directory_with_missing_parent_directories(): void
+    {
+        // Create a path with multiple missing parent directories
+        $deepLangPath = sys_get_temp_dir().'/localizator_deep_'.uniqid().'/missing/parent/dirs/lang';
+        
+        // Make sure the entire path doesn't exist
+        $this->assertDirectoryDoesNotExist($deepLangPath);
+        $this->assertDirectoryDoesNotExist(dirname($deepLangPath));
+        
+        // Create new generator and set the deep path
+        $generator = new TranslationGeneratorService();
+        $reflection = new \ReflectionClass($generator);
+        $property = $reflection->getProperty('langPath');
+        $property->setAccessible(true);
+        $property->setValue($generator, $deepLangPath);
+        
+        // Generate translation files (should create all parent directories)
+        $success = $generator->generateTranslationFiles(['test.deep'], ['en']);
+        
+        $this->assertTrue($success);
+        $this->assertDirectoryExists($deepLangPath);
+        $this->assertFileExists($deepLangPath.'/en/test.php');
+        
+        // Clean up the entire tree
+        $rootPath = sys_get_temp_dir().'/'.basename(dirname(dirname(dirname(dirname($deepLangPath)))));
+        $this->deleteDirectory($rootPath);
+    }
+
+    #[Test]
+    public function it_creates_lang_directory_for_json_format(): void
+    {
+        // Set JSON format
+        Config::set('localizator.localize', 'json');
+        
+        // Create a new temp directory path that doesn't exist
+        $newLangPath = sys_get_temp_dir().'/localizator_json_'.uniqid();
+        
+        // Make sure directory doesn't exist initially
+        $this->assertDirectoryDoesNotExist($newLangPath);
+        
+        // Create new generator and set the non-existent path
+        $generator = new TranslationGeneratorService();
+        $reflection = new \ReflectionClass($generator);
+        $property = $reflection->getProperty('langPath');
+        $property->setAccessible(true);
+        $property->setValue($generator, $newLangPath);
+        
+        // Generate JSON translation files
+        $success = $generator->generateTranslationFiles(['test.json.key'], ['en']);
+        
+        $this->assertTrue($success);
+        $this->assertDirectoryExists($newLangPath);
+        $this->assertFileExists($newLangPath.'/en.json');
+        
+        // Verify it's valid JSON
+        $content = file_get_contents($newLangPath.'/en.json');
+        $this->assertNotNull(json_decode($content, true));
+        
+        // Clean up
+        $this->deleteDirectory($newLangPath);
+    }
+
+    #[Test]
     public function it_preserves_existing_translations_with_incremental_updates(): void
     {
         // Create existing translation file with some content

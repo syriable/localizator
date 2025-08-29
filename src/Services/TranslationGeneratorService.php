@@ -56,6 +56,14 @@ class TranslationGeneratorService implements TranslationGenerator
             // Manually create directory for older Laravel versions
             $this->createLangDirectoryManually();
         }
+        
+        // Verify the directory was created successfully
+        if (!File::exists($this->langPath)) {
+            throw new \RuntimeException(
+                "Failed to create language directory at '{$this->langPath}'. " .
+                "Please check directory permissions and ensure you have write access to the parent directory."
+            );
+        }
     }
 
     /**
@@ -80,6 +88,15 @@ class TranslationGeneratorService implements TranslationGenerator
         try {
             if (function_exists('app') && app()->bound('artisan')) {
                 app('artisan')->call('lang:publish');
+                
+                // If the command succeeded but directory still doesn't exist,
+                // fall back to manual creation
+                if (!File::exists($this->langPath)) {
+                    $this->createLangDirectoryManually();
+                }
+            } else {
+                // Laravel environment not available, use manual creation
+                $this->createLangDirectoryManually();
             }
         } catch (\Exception $e) {
             // Fall back to manual creation if command fails
@@ -93,10 +110,21 @@ class TranslationGeneratorService implements TranslationGenerator
     private function createLangDirectoryManually(): void
     {
         try {
+            // Ensure parent directories exist first
+            $parentDir = dirname($this->langPath);
+            if (!File::exists($parentDir)) {
+                File::makeDirectory($parentDir, 0755, true);
+            }
+            
+            // Now create the lang directory
             File::makeDirectory($this->langPath, 0755, true);
         } catch (\Exception $e) {
-            // If we can't create the directory, we'll fail gracefully later
-            // when trying to write files
+            // If we can't create the directory, throw a more descriptive error
+            throw new \RuntimeException(
+                "Could not create language directory at '{$this->langPath}'. " .
+                "Please check directory permissions and ensure the parent directory exists. " .
+                "Error: {$e->getMessage()}"
+            );
         }
     }
 
@@ -149,6 +177,11 @@ class TranslationGeneratorService implements TranslationGenerator
 
     public function generateJsonTranslationFile(string $locale, array $translations): bool
     {
+        // Ensure the language directory exists
+        if (!File::exists($this->langPath)) {
+            $this->ensureLangDirectoryExists();
+        }
+        
         $filePath = $this->langPath."/{$locale}.json";
 
         // Only create backup if explicitly requested (production-safe)
@@ -178,6 +211,11 @@ class TranslationGeneratorService implements TranslationGenerator
 
     public function generatePhpTranslationFile(string $locale, array $translations): bool
     {
+        // Ensure the language directory exists first
+        if (!File::exists($this->langPath)) {
+            $this->ensureLangDirectoryExists();
+        }
+        
         $success = true;
         $localeDir = $this->langPath."/{$locale}";
 

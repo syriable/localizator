@@ -134,9 +134,30 @@ AZURE_TRANSLATOR_ENDPOINT=your-endpoint
 
 ## 🛠️ Usage
 
-### Basic Scanning
+### Automatic Generation (Recommended)
 
-Scan your application and generate translation files for specific locales:
+Generate all translation files automatically without any interactive prompts:
+
+```bash
+# Generate for default locales (configured in config/localizator.php)
+php artisan localizator:generate
+
+# Generate for specific locales
+php artisan localizator:generate en es fr de
+
+# Silent mode (no output except errors)
+php artisan localizator:generate --silent
+
+# With AI auto-translation
+php artisan localizator:generate es fr --auto-translate
+
+# Force overwrite without backup
+php artisan localizator:generate en --force
+```
+
+### Interactive Scanning
+
+Scan your application with interactive prompts and review options:
 
 ```bash
 php artisan localizator:scan en es fr de
@@ -174,6 +195,20 @@ php artisan localizator:scan en --backup
 # Verbose output for debugging
 php artisan localizator:scan en -v
 ```
+
+### Command Comparison
+
+| Feature | `localizator:generate` | `localizator:scan` |
+|---------|----------------------|-------------------|
+| **Interaction** | Fully automatic, zero prompts | Interactive with prompts and choices |
+| **Locale Selection** | Uses config defaults or arguments | Prompts for locale selection if not specified |
+| **AI Review** | Auto-accepts all translations | Optional review process for AI translations |
+| **Best for** | CI/CD, automated workflows | Manual control, reviewing translations |
+| **Speed** | Fast, no waiting for input | Slower due to interactive prompts |
+| **Silent Mode** | Yes (`--silent` flag) | No |
+| **Configuration** | Uses `locales` from config | Always prompts if no arguments |
+
+**Recommendation**: Use `localizator:generate` for most cases, especially in automated environments. Use `localizator:scan` when you need to review and approve translations manually.
 
 ### Interactive Mode
 

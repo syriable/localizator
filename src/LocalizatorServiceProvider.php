@@ -6,6 +6,7 @@ namespace Syriable\Localizator;
 
 use Illuminate\Support\ServiceProvider;
 use Syriable\Localizator\Commands\LocalizatorScanCommand;
+use Syriable\Localizator\Commands\LocalizatorGenerateCommand;
 use Syriable\Localizator\Contracts\FileScanner;
 use Syriable\Localizator\Contracts\TranslationGenerator;
 use Syriable\Localizator\Contracts\TranslationService;
@@ -32,6 +33,7 @@ class LocalizatorServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 LocalizatorScanCommand::class,
+                LocalizatorGenerateCommand::class,
             ]);
 
             $this->publishes([

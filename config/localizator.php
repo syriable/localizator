@@ -27,6 +27,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Default Locales
+    |--------------------------------------------------------------------------
+    |
+    | Default locales to generate when using the automatic generate command
+    | without specifying locales. These will be used by localizator:generate
+    | when no locales are provided as arguments.
+    |
+    */
+    'locales' => [
+        'en',
+        // Add more default locales as needed:
+        // 'es', 'fr', 'de', 'it', 'pt', 'ru', 'ja', 'ko', 'zh'
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Search Directories
     |--------------------------------------------------------------------------
     |

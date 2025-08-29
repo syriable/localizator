@@ -58,6 +58,11 @@ class LocalizatorScanCommand extends Command
         $shouldReview = (bool) ($this->option('review') || Config::get('localizator.ai.review_required', true));
         $isDryRun = (bool) $this->option('dry-run');
 
+        // Apply remove-missing option to config
+        if ($this->option('remove-missing')) {
+            Config::set('localizator.remove_missing', true);
+        }
+
         // Override AI provider if specified
         if ($provider = $this->option('provider')) {
             Config::set('localizator.ai.provider', $provider);

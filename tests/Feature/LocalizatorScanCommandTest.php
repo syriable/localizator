@@ -112,4 +112,34 @@ class LocalizatorScanCommandTest extends TestCase
         
         // Actual preservation logic is tested in unit tests
     }
+
+    #[Test]
+    public function it_handles_remove_missing_with_json_format(): void
+    {
+        Config::set('localizator.dirs', [__DIR__.'/../fixtures']);
+
+        // Test with JSON format and remove-missing option
+        $this->artisan('localizator:scan', [
+            'locales' => ['en'], 
+            '--format' => 'json',
+            '--remove-missing' => true
+        ])
+            ->expectsOutputToContain('Using json format')
+            ->assertExitCode(0);
+    }
+
+    #[Test]
+    public function it_handles_remove_missing_with_php_format(): void
+    {
+        Config::set('localizator.dirs', [__DIR__.'/../fixtures']);
+
+        // Test with PHP format and remove-missing option
+        $this->artisan('localizator:scan', [
+            'locales' => ['en'], 
+            '--format' => 'php',
+            '--remove-missing' => true
+        ])
+            ->expectsOutputToContain('Using php format')
+            ->assertExitCode(0);
+    }
 }

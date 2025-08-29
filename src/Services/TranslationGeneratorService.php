@@ -330,6 +330,12 @@ class TranslationGeneratorService implements TranslationGenerator
             // If key already exists, leave its value unchanged (production-safe)
         }
 
+        // Remove missing translations if configured
+        if (Config::get('localizator.remove_missing', false)) {
+            $keysToKeep = array_flip($translationKeys);
+            $translations = array_intersect_key($translations, $keysToKeep);
+        }
+
         return $translations;
     }
 

@@ -568,6 +568,130 @@ class NestedTranslationGeneratorTest extends TestCase
         $this->assertEquals('Default New Value', $merged['messages.new_key']);
     }
 
+    #[Test]
+    public function it_removes_missing_translations_from_json_when_configured(): void
+    {
+        // Set JSON format
+        Config::set('localizator.localize', 'json');
+        
+        // Create existing JSON file with extra translations
+        $jsonFile = $this->tempLangPath.'/en.json';
+        file_put_contents($jsonFile, json_encode([
+            'existing_key' => 'Existing Value',
+            'old_key_to_remove' => 'This should be removed',
+            'another_old_key' => 'This should also be removed',
+        ], JSON_PRETTY_PRINT));
+        
+        // Enable remove missing
+        Config::set('localizator.remove_missing', true);
+        
+        // Only include some of the existing keys in new translations
+        $newTranslations = [
+            'existing_key' => 'Keep this',
+            'new_key' => 'Add this',
+        ];
+        
+        $merged = $this->generator->mergeExistingTranslations('en', $newTranslations);
+        
+        // Should only contain keys that are in the new translations
+        $this->assertArrayHasKey('existing_key', $merged);
+        $this->assertArrayHasKey('new_key', $merged);
+        $this->assertArrayNotHasKey('old_key_to_remove', $merged);
+        $this->assertArrayNotHasKey('another_old_key', $merged);
+        
+        // Should preserve existing values
+        $this->assertEquals('Existing Value', $merged['existing_key']);
+        $this->assertEquals('Add this', $merged['new_key']);
+    }
+
+    #[Test]
+    public function it_removes_missing_translations_from_php_when_configured(): void
+    {
+        // Create existing PHP files with extra translations
+        $enDir = $this->tempLangPath.'/en';
+        mkdir($enDir, 0755, true);
+        
+        $messagesFile = $enDir.'/messages.php';
+        file_put_contents($messagesFile, "<?php\n\nreturn [\n    'existing_key' => 'Existing Value',\n    'old_key_to_remove' => 'This should be removed',\n];\n");
+        
+        $authFile = $enDir.'/auth.php';
+        file_put_contents($authFile, "<?php\n\nreturn [\n    'login' => 'Login Value',\n    'old_auth_key' => 'This should be removed',\n];\n");
+        
+        // Enable remove missing
+        Config::set('localizator.remove_missing', true);
+        
+        // Only include some of the existing keys in new translations
+        $newTranslations = [
+            'messages.existing_key' => 'Keep this',
+            'messages.new_key' => 'Add this',
+            'auth.login' => 'Keep login',
+            'other.new_section' => 'New section',
+        ];
+        
+        $merged = $this->generator->mergeExistingTranslations('en', $newTranslations);
+        
+        // Should only contain keys that are in the new translations
+        $this->assertArrayHasKey('messages.existing_key', $merged);
+        $this->assertArrayHasKey('messages.new_key', $merged);
+        $this->assertArrayHasKey('auth.login', $merged);
+        $this->assertArrayHasKey('other.new_section', $merged);
+        
+        // Should NOT contain removed keys
+        $this->assertArrayNotHasKey('messages.old_key_to_remove', $merged);
+        $this->assertArrayNotHasKey('auth.old_auth_key', $merged);
+        
+        // Should preserve existing values
+        $this->assertEquals('Existing Value', $merged['messages.existing_key']);
+        $this->assertEquals('Login Value', $merged['auth.login']);
+        $this->assertEquals('Add this', $merged['messages.new_key']);
+        $this->assertEquals('New section', $merged['other.new_section']);
+    }
+
+    #[Test]
+    public function it_applies_remove_missing_to_generated_json_files(): void
+    {
+        // Set JSON format
+        Config::set('localizator.localize', 'json');
+        Config::set('localizator.remove_missing', true);
+        
+        // Create existing JSON file with extra translations
+        $jsonFile = $this->tempLangPath.'/en.json';
+        file_put_contents($jsonFile, json_encode([
+            'auth.login' => 'Login',
+            'auth.logout' => 'Logout', 
+            'old.unused_key' => 'This should be removed',
+            'messages.welcome' => 'Welcome',
+        ], JSON_PRETTY_PRINT));
+        
+        // Generate files with only some keys present
+        $translationKeys = [
+            'auth.login',
+            'messages.welcome',
+            'new.key',
+        ];
+        
+        $success = $this->generator->generateTranslationFiles($translationKeys, ['en']);
+        $this->assertTrue($success);
+        
+        // Verify JSON file was updated correctly
+        $this->assertFileExists($jsonFile);
+        $content = json_decode(file_get_contents($jsonFile), true);
+        
+        // Should keep existing translations that are still in use
+        $this->assertArrayHasKey('auth.login', $content);
+        $this->assertEquals('Login', $content['auth.login']);
+        $this->assertArrayHasKey('messages.welcome', $content);
+        $this->assertEquals('Welcome', $content['messages.welcome']);
+        
+        // Should add new key with default value
+        $this->assertArrayHasKey('new.key', $content);
+        $this->assertEquals('Key', $content['new.key']);
+        
+        // Should remove unused keys
+        $this->assertArrayNotHasKey('auth.logout', $content);
+        $this->assertArrayNotHasKey('old.unused_key', $content);
+    }
+
     private function deleteDirectory(string $dir): void
     {
         if (! is_dir($dir)) {

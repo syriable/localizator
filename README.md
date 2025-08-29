@@ -10,6 +10,8 @@ An advanced Laravel package for automatic translation scanning and AI-powered tr
 ## 🚀 Features
 
 - **🔍 Comprehensive Scanning**: Automatically scan PHP, Blade, Vue.js, and JavaScript files for translation functions
+- **🚫 Smart Comment Detection**: Automatically skip translation keys in comments (`/* {{ __('key') }} */`)
+- **🧹 Remove Missing Keys**: Clean up unused translation keys from language files with `--remove-missing`
 - **🤖 AI-Powered Translations**: Generate translations using OpenAI, Claude, Google Translate, or Azure Translator
 - **📁 Multiple Formats**: Support for both JSON and PHP array translation files
 - **⚙️ Highly Configurable**: Extensive configuration options for customizing behavior
@@ -174,7 +176,7 @@ The scan command supports various options for different use cases:
 # Dry run - see what would be done without making changes
 php artisan localizator:scan en --dry-run
 
-# Remove missing translation keys
+# Remove missing translation keys (clean up unused keys)
 php artisan localizator:scan en --remove-missing
 
 # Sort translation keys alphabetically
@@ -227,6 +229,39 @@ php artisan localizator:scan
 ## 🔍 What Gets Scanned
 
 The package automatically detects and extracts translation keys from:
+
+### Comment Detection & Skipping
+
+**NEW in v1.4.0**: The package now automatically skips translation keys found in comments, preventing disabled or temporary keys from being added to your language files.
+
+**Supported Comment Types:**
+```php
+// C-style comments
+/* {{ __('disabled.key') }} */
+
+// Single-line comments  
+// {{ __('commented.key') }}
+
+// Blade comments
+{{-- {{ __('blade.disabled.key') }} --}}
+
+// HTML comments
+<!-- {{ __('html.commented.key') }} -->
+
+// Multiline comments
+/*
+ * {{ __('multiline.disabled.key1') }}
+ * {{ __('multiline.disabled.key2') }}
+ */
+```
+
+**Why This Matters:**
+- ✅ Prevents cluttering language files with temporary/disabled keys
+- ✅ Keeps your translations clean and organized  
+- ✅ Allows developers to comment out translations without affecting builds
+- ✅ Works automatically - no configuration needed
+
+### File Types Scanned
 
 ### PHP Files
 ```php
@@ -299,6 +334,71 @@ The package automatically organizes translation files based on dot notation keys
 ✅ **Deep Nesting**: Supports unlimited nesting levels (`auth.forms.login.validation.required`)  
 ✅ **Backward Compatible**: Can be disabled with `'nested' => false`  
 ✅ **Merge Existing**: Intelligently merges with existing translation files  
+
+## 🧹 Remove Missing Keys
+
+**NEW in v1.4.0**: The `--remove-missing` option has been improved to properly clean up unused translation keys from your language files.
+
+### How It Works
+
+When you delete translation keys from your source code, they remain in your language files. The `--remove-missing` flag solves this by:
+
+1. **Scanning** your codebase for currently used translation keys
+2. **Comparing** with existing translation files  
+3. **Removing** keys that no longer exist in your source code
+4. **Preserving** all keys that are still in use
+
+### Usage Examples
+
+```bash
+# Remove unused keys from English translations
+php artisan localizator:scan en --remove-missing
+
+# Remove unused keys and create backups
+php artisan localizator:scan en --remove-missing --backup
+
+# See what would be removed without making changes
+php artisan localizator:scan en --remove-missing --dry-run
+
+# Remove unused keys from multiple locales
+php artisan localizator:scan en es fr --remove-missing
+```
+
+### Before & After Example
+
+**Before** (your source code changed):
+```php
+// You removed this from your Blade file:
+// {{ __('auth.old_feature') }}
+
+// But kept this:
+{{ __('auth.login.title') }}
+```
+
+**Translation file before cleanup:**
+```php
+// resources/lang/en/auth.php
+return [
+    'login' => ['title' => 'Login'],
+    'old_feature' => 'This is no longer used',  // ← Will be removed
+];
+```
+
+**After running `--remove-missing`:**
+```php
+// resources/lang/en/auth.php
+return [
+    'login' => ['title' => 'Login'],  // ← Preserved
+    // 'old_feature' removed automatically
+];
+```
+
+### Safety Features
+
+- ✅ **Dry Run**: Use `--dry-run` to preview changes before applying
+- ✅ **Backups**: Use `--backup` to create timestamped backups
+- ✅ **Incremental**: Only removes unused keys, preserves translations
+- ✅ **Multi-format**: Works with both PHP and JSON translation files
 
 ## 🤖 AI Translation Features
 
@@ -497,6 +597,7 @@ Customize the generated files:
 **1. No translation keys found**
 - Check that your `functions` configuration includes all translation methods used in your codebase
 - Verify that the `dirs` and `patterns` settings cover your file locations
+- Ensure keys aren't all commented out (v1.4.0+ automatically skips commented keys)
 - Use `--dry-run -v` to see detailed scanning information
 
 **2. AI translation failures**
@@ -504,7 +605,13 @@ Customize the generated files:
 - Check your API quotas and rate limits
 - Use smaller batch sizes if encountering timeout errors
 
-**3. Permission errors**
+**3. --remove-missing not working**
+- Ensure the command completed successfully (exit code 0)
+- Check that translation keys were actually removed from your source code
+- Use `--dry-run` to see what keys would be removed before running
+- Verify you're scanning the correct directories with `--dry-run -v`
+
+**4. Permission errors**
 - Ensure Laravel has write permissions to the `resources/lang` directory
 - Check file ownership and permissions
 

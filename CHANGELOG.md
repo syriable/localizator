@@ -2,6 +2,34 @@
 
 All notable changes to `syriable/localizator` will be documented in this file.
 
+## [1.4.0] - 2025-08-29
+
+### Added
+- **Comment Detection & Skipping**: Automatically skip translation keys found in comments
+  - Supports C-style comments (`/* {{ __('key') }} */`)
+  - Supports single-line comments (`// {{ __('key') }}`)
+  - Supports Blade comments (`{{-- {{ __('key') }} --}}`)
+  - Supports HTML comments (`<!-- {{ __('key') }} -->`)
+  - Works with multiline comments across all formats
+  - Prevents cluttering language files with disabled/temporary keys
+
+### Fixed
+- **--remove-missing Option**: Fixed critical issue where `--remove-missing` flag wasn't working properly
+  - Now correctly removes unused translation keys from language files
+  - Fixed configuration not being applied in scan command
+  - Enhanced TranslationGeneratorService to handle remove-missing during incremental updates
+  - Added comprehensive integration test to verify end-to-end functionality
+
+### Enhanced
+- **FileScannerService**: Added `removeCommentedTranslations()` method with regex patterns for all comment types
+- **Test Coverage**: Added 8 comprehensive unit tests for comment-skipping functionality
+- **Documentation**: Updated README with detailed examples and troubleshooting for both new features
+
+### Technical
+- Enhanced `LocalizatorScanCommand.php` with proper config setting for remove-missing option
+- Improved `TranslationGeneratorService.php` incremental update logic
+- All tests passing (51+ total tests with comprehensive coverage)
+
 ## [Unreleased]
 
 ### Added

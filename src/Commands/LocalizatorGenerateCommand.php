@@ -18,6 +18,7 @@ class LocalizatorGenerateCommand extends Command
                             {--source-lang=en : Source language for AI translations}
                             {--provider= : AI provider to use (openai, claude, google, azure)}
                             {--batch-size=50 : Number of translations to process in each batch}
+                            {--format= : Output format (php, json) - overrides config setting}
                             {--force : Overwrite existing translation files without backup}
                             {--silent : Suppress all output except errors}';
 
@@ -67,6 +68,22 @@ class LocalizatorGenerateCommand extends Command
         // Override AI provider if specified
         if ($provider = $this->option('provider')) {
             Config::set('localizator.ai.provider', $provider);
+        }
+
+        // Override output format if specified
+        if ($format = $this->option('format')) {
+            if (! in_array($format, ['php', 'json', 'default'])) {
+                $this->error('❌ Invalid format. Supported formats: php, json');
+                return self::FAILURE;
+            }
+            
+            // Convert 'php' to 'default' for internal consistency
+            $format = $format === 'php' ? 'default' : $format;
+            Config::set('localizator.localize', $format);
+            
+            if (! $isSilent) {
+                $this->info("📄 Using {$this->option('format')} format");
+            }
         }
 
         try {

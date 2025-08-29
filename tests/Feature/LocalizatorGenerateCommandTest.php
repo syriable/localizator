@@ -101,4 +101,47 @@ class LocalizatorGenerateCommandTest extends TestCase
         $this->artisan('localizator:generate', ['--batch-size' => 25])
             ->assertExitCode(0);
     }
+
+    #[Test]
+    public function it_handles_json_format_option(): void
+    {
+        Config::set('localizator.dirs', [__DIR__.'/../fixtures']);
+        Config::set('localizator.locales', ['en']);
+
+        $this->artisan('localizator:generate', ['--format' => 'json'])
+            ->expectsOutputToContain('Using json format')
+            ->assertExitCode(0);
+    }
+
+    #[Test]
+    public function it_handles_php_format_option(): void
+    {
+        Config::set('localizator.dirs', [__DIR__.'/../fixtures']);
+        Config::set('localizator.locales', ['en']);
+
+        $this->artisan('localizator:generate', ['--format' => 'php'])
+            ->expectsOutputToContain('Using php format')
+            ->assertExitCode(0);
+    }
+
+    #[Test]
+    public function it_rejects_invalid_format_option(): void
+    {
+        Config::set('localizator.dirs', [__DIR__.'/../fixtures']);
+        Config::set('localizator.locales', ['en']);
+
+        $this->artisan('localizator:generate', ['--format' => 'invalid'])
+            ->expectsOutputToContain('Invalid format. Supported formats: php, json')
+            ->assertExitCode(1);
+    }
+
+    #[Test]
+    public function it_uses_json_format_in_silent_mode(): void
+    {
+        Config::set('localizator.dirs', [__DIR__.'/../fixtures']);
+        Config::set('localizator.locales', ['en']);
+
+        $this->artisan('localizator:generate', ['--format' => 'json', '--silent' => true])
+            ->assertExitCode(0);
+    }
 }

@@ -151,6 +151,9 @@ php artisan localizator:generate --silent
 # With AI auto-translation
 php artisan localizator:generate es fr --auto-translate
 
+# Generate JSON files instead of PHP
+php artisan localizator:generate en --format=json
+
 # Force overwrite without backup
 php artisan localizator:generate en --force
 ```
@@ -188,6 +191,9 @@ php artisan localizator:scan es --auto-translate --provider=claude --source-lang
 
 # Custom batch size for AI translations
 php artisan localizator:scan es --auto-translate --batch-size=25
+
+# Generate JSON files instead of PHP
+php artisan localizator:scan en --format=json
 
 # Create backups of existing files
 php artisan localizator:scan en --backup

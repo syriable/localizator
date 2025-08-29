@@ -59,6 +59,9 @@ class FileScannerService implements FileScanner
     {
         $keys = [];
 
+        // Remove commented/disabled translation keys before extraction
+        $content = $this->removeCommentedTranslations($content);
+
         foreach ($this->functions as $function) {
             $keys = array_merge($keys, $this->extractKeysForFunction($content, $function));
         }
@@ -223,5 +226,36 @@ class FileScannerService implements FileScanner
                str_contains($key, '{$') ||
                str_contains($key, '${') ||
                preg_match('/^\$[a-zA-Z_]/', $key) === 1; // Starts with variable syntax
+    }
+
+    /**
+     * Remove commented/disabled translation keys from content
+     * Supports various comment formats:
+     * - C-style comments: slash-star content star-slash 
+     * - Single-line comments: // content
+     * - Blade comments: {{-- content --}}
+     * - HTML comments: <!-- content -->
+     */
+    private function removeCommentedTranslations(string $content): string
+    {
+        $patterns = [
+            // Multi-line C-style comments: /* {{ __('key') }} */
+            '/\/\*.*?\*\//s',
+            
+            // Single-line C++ style comments: // {{ __('key') }}
+            '/\/\/.*?(?=\n|$)/m',
+            
+            // Blade comments: {{-- __('key') --}}
+            '/\{\{--.*?--\}\}/s',
+            
+            // HTML comments: <!-- {{ __('key') }} -->
+            '/<!--.*?-->/s',
+        ];
+
+        foreach ($patterns as $pattern) {
+            $content = preg_replace($pattern, '', $content);
+        }
+
+        return $content;
     }
 }

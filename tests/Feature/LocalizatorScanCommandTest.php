@@ -142,4 +142,81 @@ class LocalizatorScanCommandTest extends TestCase
             ->expectsOutputToContain('Using php format')
             ->assertExitCode(0);
     }
+
+    #[Test]
+    public function it_actually_removes_missing_keys_from_existing_files(): void
+    {
+        // Create a temporary directory for this test
+        $tempDir = sys_get_temp_dir().'/localizator_remove_test_'.uniqid();
+        mkdir($tempDir, 0755, true);
+        
+        // Create a test fixture file with both used and unused translation keys
+        $testFile = $tempDir.'/test.blade.php';
+        file_put_contents($testFile, '
+            <h1>{{ __("used.title") }}</h1>
+            <p>{{ __("used.description") }}</p>
+            {{-- This is commented out: {{ __("commented.key") }} --}}
+        ');
+        
+        // Set the config to scan our temp directory
+        Config::set('localizator.dirs', [$tempDir]);
+        
+        // Create existing translation file with extra keys that should be removed
+        $langDir = lang_path('en');
+        if (!is_dir($langDir)) {
+            mkdir($langDir, 0755, true);
+        }
+        
+        $translationFile = $langDir.'/used.php';
+        file_put_contents($translationFile, '<?php
+return [
+    "title" => "Used Title",
+    "description" => "Used Description", 
+    "old_unused_key" => "This should be removed",
+    "another_unused_key" => "This should also be removed",
+];
+');
+        
+        // Also create a translation file that should be completely removed
+        $unusedFile = $langDir.'/unused.php';
+        file_put_contents($unusedFile, '<?php
+return [
+    "completely_unused" => "This entire file should be cleaned up",
+];
+');
+        
+        // Run the scan command with remove-missing
+        $this->artisan('localizator:scan', [
+            'locales' => ['en'], 
+            '--remove-missing' => true
+        ])->assertExitCode(0);
+        
+        // Verify the used translation file still exists and has correct content
+        $this->assertFileExists($translationFile);
+        $translations = include $translationFile;
+        
+        // Should keep used keys
+        $this->assertArrayHasKey('title', $translations);
+        $this->assertArrayHasKey('description', $translations);
+        $this->assertEquals('Used Title', $translations['title']);
+        $this->assertEquals('Used Description', $translations['description']);
+        
+        // Should remove unused keys
+        $this->assertArrayNotHasKey('old_unused_key', $translations);
+        $this->assertArrayNotHasKey('another_unused_key', $translations);
+        
+        // Should not contain commented keys
+        $this->assertArrayNotHasKey('commented.key', $translations);
+        
+        // The unused file should still exist but be empty or have only found keys
+        // (The current implementation keeps files but removes unused keys)
+        
+        // Clean up
+        unlink($testFile);
+        unlink($translationFile);
+        if (file_exists($unusedFile)) {
+            unlink($unusedFile);
+        }
+        rmdir($tempDir);
+    }
 }

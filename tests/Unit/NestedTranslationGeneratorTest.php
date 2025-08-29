@@ -186,6 +186,72 @@ class NestedTranslationGeneratorTest extends TestCase
         $this->assertEquals($expectedMerged, $mergedTranslations);
     }
 
+    #[Test]
+    public function it_generates_sensible_default_values_from_keys(): void
+    {
+        $translationKeys = [
+            'mine.dashboard',
+            'user.profile_settings',
+            'auth.forgot-password',
+            'navigation.main_menu',
+            'validation.email_required',
+        ];
+
+        // Use reflection to call the private method
+        $reflection = new \ReflectionClass($this->generator);
+        $method = $reflection->getMethod('prepareTranslations');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->generator, $translationKeys, []);
+
+        $expected = [
+            'mine.dashboard' => 'Dashboard',
+            'user.profile_settings' => 'Profile Settings',
+            'auth.forgot-password' => 'Forgot Password',
+            'navigation.main_menu' => 'Main Menu',
+            'validation.email_required' => 'Email Required',
+        ];
+
+        $this->assertEquals($expected, $result);
+    }
+
+    #[Test]
+    public function it_generates_proper_nested_structure_with_default_values(): void
+    {
+        $translationKeys = [
+            'mine.dashboard',
+            'mine.profile',
+            'admin.users',
+        ];
+
+        $success = $this->generator->generateTranslationFiles($translationKeys, ['en']);
+
+        $this->assertTrue($success);
+
+        // Check mine.php file structure
+        $mineFile = $this->tempLangPath.'/en/mine.php';
+        $this->assertFileExists($mineFile);
+
+        $mineTranslations = include $mineFile;
+        $expectedMineStructure = [
+            'dashboard' => 'Dashboard',
+            'profile' => 'Profile',
+        ];
+
+        $this->assertEquals($expectedMineStructure, $mineTranslations);
+
+        // Check admin.php file structure
+        $adminFile = $this->tempLangPath.'/en/admin.php';
+        $this->assertFileExists($adminFile);
+
+        $adminTranslations = include $adminFile;
+        $expectedAdminStructure = [
+            'users' => 'Users',
+        ];
+
+        $this->assertEquals($expectedAdminStructure, $adminTranslations);
+    }
+
     private function deleteDirectory(string $dir): void
     {
         if (! is_dir($dir)) {

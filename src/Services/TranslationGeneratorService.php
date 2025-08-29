@@ -173,12 +173,25 @@ class TranslationGeneratorService implements TranslationGenerator
             if (isset($existingTranslations[$key])) {
                 $translations[$key] = $existingTranslations[$key];
             } else {
-                // Use the key as the default value if no translation exists
-                $translations[$key] = $key;
+                // Generate a sensible default value from the key
+                $translations[$key] = $this->generateDefaultTranslation($key);
             }
         }
 
         return $translations;
+    }
+
+    private function generateDefaultTranslation(string $key): string
+    {
+        // Extract the last part of the dot notation key
+        $parts = explode('.', $key);
+        $lastPart = end($parts);
+        
+        // Convert snake_case or kebab-case to Title Case
+        $humanized = str_replace(['_', '-'], ' ', $lastPart);
+        $humanized = ucwords($humanized);
+        
+        return $humanized;
     }
 
     private function groupTranslationsByFile(array $translations): array

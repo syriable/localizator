@@ -77,6 +77,13 @@ class LocalizatorScanCommand extends Command
             $this->info("📄 Using {$this->option('format')} format");
         }
 
+        // Handle backup setting (production-safe)
+        if ($this->option('backup')) {
+            Config::set('localizator.output.backup', true);
+            $this->info('🗃️  Backup mode enabled');
+        }
+        // Otherwise, use default config setting (false by default for production safety)
+
         try {
             // Step 1: Scan for translation keys
             $this->info('📁 Scanning directories for translation functions...');

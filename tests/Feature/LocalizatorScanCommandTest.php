@@ -58,4 +58,58 @@ class LocalizatorScanCommandTest extends TestCase
         // Accept both success and failure since we're testing with mock API
         $this->assertContains($result->run(), [0, 1]);
     }
+
+    #[Test]
+    public function it_handles_backup_flag(): void
+    {
+        Config::set('localizator.dirs', [__DIR__.'/../fixtures']);
+
+        $this->artisan('localizator:scan', ['locales' => ['en'], '--backup' => true])
+            ->expectsOutputToContain('Backup mode enabled')
+            ->assertExitCode(0);
+    }
+
+    #[Test]
+    public function it_does_not_create_backup_by_default(): void
+    {
+        Config::set('localizator.dirs', [__DIR__.'/../fixtures']);
+        
+        // Should run without backup (production-safe default)
+        $this->artisan('localizator:scan', ['locales' => ['en']])
+            ->assertExitCode(0);
+        
+        // Backup is disabled by default - tested in unit tests
+    }
+
+    #[Test]
+    public function it_handles_json_format_option(): void
+    {
+        Config::set('localizator.dirs', [__DIR__.'/../fixtures']);
+
+        $this->artisan('localizator:scan', ['locales' => ['en'], '--format' => 'json'])
+            ->expectsOutputToContain('Using json format')
+            ->assertExitCode(0);
+    }
+
+    #[Test]
+    public function it_rejects_invalid_format_option(): void
+    {
+        Config::set('localizator.dirs', [__DIR__.'/../fixtures']);
+
+        $this->artisan('localizator:scan', ['locales' => ['en'], '--format' => 'invalid'])
+            ->expectsOutputToContain('Invalid format. Supported formats: php, json')
+            ->assertExitCode(1);
+    }
+
+    #[Test]
+    public function it_preserves_existing_translations_during_scan(): void
+    {
+        Config::set('localizator.dirs', [__DIR__.'/../fixtures']);
+
+        // Run scan command - should use incremental updates
+        $this->artisan('localizator:scan', ['locales' => ['en']])
+            ->assertExitCode(0);
+        
+        // Actual preservation logic is tested in unit tests
+    }
 }

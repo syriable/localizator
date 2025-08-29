@@ -19,6 +19,7 @@ class LocalizatorGenerateCommand extends Command
                             {--provider= : AI provider to use (openai, claude, google, azure)}
                             {--batch-size=50 : Number of translations to process in each batch}
                             {--format= : Output format (php, json) - overrides config setting}
+                            {--backup : Create backup files before updating (disabled by default for production safety)}
                             {--force : Overwrite existing translation files without backup}
                             {--silent : Suppress all output except errors}';
 
@@ -55,15 +56,24 @@ class LocalizatorGenerateCommand extends Command
         $locales = $this->getLocales();
         $shouldAutoTranslate = (bool) ($this->option('auto-translate') || Config::get('localizator.ai.auto_translate', false));
         $isForced = (bool) $this->option('force');
+        $shouldBackup = (bool) $this->option('backup');
 
         // Override configurations for automatic mode
         Config::set('localizator.remove_missing', false);
         Config::set('localizator.sort', true);
         Config::set('localizator.ai.review_required', false); // No review in automatic mode
         
-        if (! $isForced) {
-            Config::set('localizator.output.backup', true); // Always backup unless forced
+        // Handle backup setting (production-safe)
+        if ($shouldBackup) {
+            Config::set('localizator.output.backup', true);
+            if (! $isSilent) {
+                $this->info('🗃️  Backup mode enabled');
+            }
+        } elseif ($isForced) {
+            // Force mode: Explicitly disable backups for faster operation
+            Config::set('localizator.output.backup', false);
         }
+        // Otherwise, use default config setting (false by default)
 
         // Override AI provider if specified
         if ($provider = $this->option('provider')) {

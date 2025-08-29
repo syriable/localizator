@@ -276,9 +276,11 @@ return [
         |--------------------------------------------------------------------------
         |
         | Whether to create backups of existing translation files before updating.
+        | Set to false by default for production safety (incremental updates).
+        | Use --backup flag or set to true to enable backups.
         |
         */
-        'backup' => true,
+        'backup' => false,
     ],
 
     /*

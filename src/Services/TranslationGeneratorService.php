@@ -16,8 +16,6 @@ class TranslationGeneratorService implements TranslationGenerator
 
     private bool $generateComments;
 
-    private bool $createBackups;
-
     private int $indent;
 
     private bool $useNestedStructure;
@@ -28,7 +26,7 @@ class TranslationGeneratorService implements TranslationGenerator
         // Don't cache localizationType - read it fresh each time to allow command overrides
         $this->shouldSort = Config::get('localizator.sort', true);
         $this->generateComments = Config::get('localizator.output.comments', true);
-        $this->createBackups = Config::get('localizator.output.backup', true);
+        // Don't cache backup setting - read it fresh to allow command overrides
         $this->indent = Config::get('localizator.output.indent', 4);
         $this->useNestedStructure = Config::get('localizator.nested', true);
     }
@@ -39,6 +37,67 @@ class TranslationGeneratorService implements TranslationGenerator
     private function getLocalizationType(): string
     {
         return Config::get('localizator.localize', 'default');
+    }
+
+    /**
+     * Ensure the language directory exists, creating it if necessary
+     */
+    private function ensureLangDirectoryExists(): void
+    {
+        if (File::exists($this->langPath)) {
+            return;
+        }
+
+        // Directory doesn't exist, try to create it
+        if ($this->supportsLangPublishCommand()) {
+            // Use Laravel's lang:publish command for Laravel 9+
+            $this->runLangPublishCommand();
+        } else {
+            // Manually create directory for older Laravel versions
+            $this->createLangDirectoryManually();
+        }
+    }
+
+    /**
+     * Check if the current Laravel version supports the lang:publish command
+     */
+    private function supportsLangPublishCommand(): bool
+    {
+        // Laravel 9+ supports lang:publish command
+        if (function_exists('app')) {
+            $laravelVersion = app()->version();
+            return version_compare($laravelVersion, '9.0', '>=');
+        }
+
+        return false;
+    }
+
+    /**
+     * Run the lang:publish artisan command
+     */
+    private function runLangPublishCommand(): void
+    {
+        try {
+            if (function_exists('app') && app()->bound('artisan')) {
+                app('artisan')->call('lang:publish');
+            }
+        } catch (\Exception $e) {
+            // Fall back to manual creation if command fails
+            $this->createLangDirectoryManually();
+        }
+    }
+
+    /**
+     * Manually create the language directory
+     */
+    private function createLangDirectoryManually(): void
+    {
+        try {
+            File::makeDirectory($this->langPath, 0755, true);
+        } catch (\Exception $e) {
+            // If we can't create the directory, we'll fail gracefully later
+            // when trying to write files
+        }
     }
 
     /**
@@ -69,11 +128,14 @@ class TranslationGeneratorService implements TranslationGenerator
 
     public function generateTranslationFiles(array $translationKeys, array $locales): bool
     {
+        // Ensure the language directory exists before proceeding
+        $this->ensureLangDirectoryExists();
+
         $success = true;
 
         foreach ($locales as $locale) {
             $existingTranslations = $this->loadExistingTranslations($locale);
-            $newTranslations = $this->prepareTranslations($translationKeys, $existingTranslations);
+            $newTranslations = $this->prepareTranslationsIncremental($translationKeys, $existingTranslations);
 
             if ($this->getLocalizationType() === 'json') {
                 $success = $success && $this->generateJsonTranslationFile($locale, $newTranslations);
@@ -89,7 +151,8 @@ class TranslationGeneratorService implements TranslationGenerator
     {
         $filePath = $this->langPath."/{$locale}.json";
 
-        if ($this->createBackups && File::exists($filePath)) {
+        // Only create backup if explicitly requested (production-safe)
+        if ($this->shouldCreateBackup() && File::exists($filePath)) {
             $this->createBackup($filePath);
         }
 
@@ -127,7 +190,8 @@ class TranslationGeneratorService implements TranslationGenerator
         foreach ($groupedTranslations as $file => $fileTranslations) {
             $filePath = $localeDir."/{$file}.php";
 
-            if ($this->createBackups && File::exists($filePath)) {
+            // Only create backup if explicitly requested (production-safe)
+            if ($this->shouldCreateBackup() && File::exists($filePath)) {
                 $this->createBackup($filePath);
             }
 
@@ -210,6 +274,27 @@ class TranslationGeneratorService implements TranslationGenerator
         return $translations;
     }
 
+    /**
+     * Prepare translations using incremental update logic (production-safe)
+     * Only adds new keys, preserves all existing keys and values
+     */
+    private function prepareTranslationsIncremental(array $translationKeys, array $existingTranslations): array
+    {
+        // Start with all existing translations to preserve them
+        $translations = $existingTranslations;
+
+        // Only add new keys that don't exist yet
+        foreach ($translationKeys as $key) {
+            if (!isset($translations[$key])) {
+                // Generate a sensible default value for new keys only
+                $translations[$key] = $this->generateDefaultTranslation($key);
+            }
+            // If key already exists, leave its value unchanged (production-safe)
+        }
+
+        return $translations;
+    }
+
     private function generateDefaultTranslation(string $key): string
     {
         // Extract the last part of the dot notation key
@@ -221,6 +306,15 @@ class TranslationGeneratorService implements TranslationGenerator
         $humanized = ucwords($humanized);
         
         return $humanized;
+    }
+
+    /**
+     * Check if backups should be created (production-safe: only when explicitly requested)
+     */
+    private function shouldCreateBackup(): bool
+    {
+        // Read fresh config to allow command overrides
+        return Config::get('localizator.output.backup', false);
     }
 
     private function groupTranslationsByFile(array $translations): array

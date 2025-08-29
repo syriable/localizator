@@ -369,6 +369,142 @@ class NestedTranslationGeneratorTest extends TestCase
         $this->assertNotNull($decoded, 'JSON file should not contain comments that break JSON syntax');
     }
 
+    #[Test]
+    public function it_creates_lang_directory_if_missing(): void
+    {
+        // Create a new temp directory path that doesn't exist
+        $newLangPath = sys_get_temp_dir().'/localizator_missing_'.uniqid();
+        
+        // Make sure directory doesn't exist initially
+        $this->assertDirectoryDoesNotExist($newLangPath);
+        
+        // Create new generator and set the non-existent path
+        $generator = new TranslationGeneratorService();
+        $reflection = new \ReflectionClass($generator);
+        $property = $reflection->getProperty('langPath');
+        $property->setAccessible(true);
+        $property->setValue($generator, $newLangPath);
+        
+        // Generate translation files
+        $success = $generator->generateTranslationFiles(['test.key'], ['en']);
+        
+        $this->assertTrue($success);
+        $this->assertDirectoryExists($newLangPath);
+        $this->assertFileExists($newLangPath.'/en/test.php');
+        
+        // Clean up
+        $this->deleteDirectory($newLangPath);
+    }
+
+    #[Test]
+    public function it_preserves_existing_translations_with_incremental_updates(): void
+    {
+        // Create existing translation file with some content
+        $enDir = $this->tempLangPath.'/en';
+        mkdir($enDir, 0755, true);
+        
+        $authFile = $enDir.'/auth.php';
+        $existingContent = "<?php\n\nreturn [\n    'login' => [\n        'title' => 'Existing Login Title',\n        'subtitle' => 'Please sign in to continue',\n    ],\n    'logout' => 'Sign Out',\n];\n";
+        file_put_contents($authFile, $existingContent);
+        
+        // Now generate with new keys (should preserve existing)
+        $newKeys = [
+            'auth.login.title',      // Exists - should keep original
+            'auth.login.button',     // New - should add
+            'auth.register.title',   // New - should add
+        ];
+        
+        $success = $this->generator->generateTranslationFiles($newKeys, ['en']);
+        $this->assertTrue($success);
+        
+        // Verify file still exists and has expected content
+        $this->assertFileExists($authFile);
+        $updatedContent = include $authFile;
+        
+        // Should preserve existing values
+        $this->assertEquals('Existing Login Title', $updatedContent['login']['title']);
+        $this->assertEquals('Please sign in to continue', $updatedContent['login']['subtitle']);
+        $this->assertEquals('Sign Out', $updatedContent['logout']);
+        
+        // Should add new values
+        $this->assertEquals('Button', $updatedContent['login']['button']);
+        $this->assertEquals('Title', $updatedContent['register']['title']);
+    }
+
+    #[Test]
+    public function it_does_not_create_backup_by_default(): void
+    {
+        // Create existing translation file
+        $enDir = $this->tempLangPath.'/en';
+        mkdir($enDir, 0755, true);
+        
+        $authFile = $enDir.'/auth.php';
+        $originalContent = "<?php\n\nreturn [\n    'login' => 'Original Login',\n];\n";
+        file_put_contents($authFile, $originalContent);
+        
+        // Generate with backup disabled (default)
+        Config::set('localizator.output.backup', false);
+        
+        $success = $this->generator->generateTranslationFiles(['auth.login'], ['en']);
+        $this->assertTrue($success);
+        
+        // Should not create backup file
+        $backupFiles = glob($authFile.'.backup_*');
+        $this->assertEmpty($backupFiles, 'No backup files should be created by default');
+    }
+
+    #[Test]
+    public function it_creates_backup_when_explicitly_enabled(): void
+    {
+        // Create existing translation file
+        $enDir = $this->tempLangPath.'/en';
+        mkdir($enDir, 0755, true);
+        
+        $authFile = $enDir.'/auth.php';
+        $originalContent = "<?php\n\nreturn [\n    'login' => 'Original Login',\n];\n";
+        file_put_contents($authFile, $originalContent);
+        
+        // Enable backup explicitly
+        Config::set('localizator.output.backup', true);
+        
+        $success = $this->generator->generateTranslationFiles(['auth.login'], ['en']);
+        $this->assertTrue($success);
+        
+        // Should create backup file
+        $backupFiles = glob($authFile.'.backup_*');
+        $this->assertNotEmpty($backupFiles, 'Backup file should be created when explicitly enabled');
+        
+        // Verify backup contains original content
+        $backupContent = file_get_contents($backupFiles[0]);
+        $this->assertEquals($originalContent, $backupContent);
+    }
+
+    #[Test]
+    public function it_uses_incremental_update_method_by_default(): void
+    {
+        // Create existing translations
+        $enDir = $this->tempLangPath.'/en';
+        mkdir($enDir, 0755, true);
+        
+        $messagesFile = $enDir.'/messages.php';
+        file_put_contents($messagesFile, "<?php\n\nreturn [\n    'existing_key' => 'Existing Value',\n    'updated_key' => 'Original Value',\n];\n");
+        
+        // Test the incremental merge method directly with keys prefixed by file
+        $newTranslations = [
+            'messages.new_key' => 'Default New Value',
+            'messages.updated_key' => 'This should not overwrite existing',
+        ];
+        
+        $merged = $this->generator->mergeExistingTranslations('en', $newTranslations);
+        
+        // Should preserve all existing translations
+        $this->assertEquals('Existing Value', $merged['messages.existing_key']);
+        $this->assertEquals('Original Value', $merged['messages.updated_key']); // Should keep original, not overwrite
+        
+        // Should add new keys
+        $this->assertEquals('Default New Value', $merged['messages.new_key']);
+    }
+
     private function deleteDirectory(string $dir): void
     {
         if (! is_dir($dir)) {

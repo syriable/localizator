@@ -26,13 +26,39 @@ class TranslationGeneratorService implements TranslationGenerator
 
     public function __construct()
     {
-        $this->langPath = resource_path('lang');
+        $this->langPath = $this->detectLangPath();
         $this->localizationType = Config::get('localizator.localize', 'default');
         $this->shouldSort = Config::get('localizator.sort', true);
         $this->generateComments = Config::get('localizator.output.comments', true);
         $this->createBackups = Config::get('localizator.output.backup', true);
         $this->indent = Config::get('localizator.output.indent', 4);
         $this->useNestedStructure = Config::get('localizator.nested', true);
+    }
+
+    /**
+     * Detect the correct language path for the current Laravel version.
+     * Laravel 9+ uses base_path('lang'), while earlier versions use resource_path('lang').
+     * This method provides backward compatibility by checking which directory exists.
+     */
+    private function detectLangPath(): string
+    {
+        // Check if Laravel provides the langPath method (Laravel 9+)
+        if (function_exists('app') && method_exists(app(), 'langPath')) {
+            return app()->langPath();
+        }
+
+        // Fallback: Check for the new location first (Laravel 9+), then old location (Laravel 8-)
+        $newLangPath = base_path('lang');
+        $oldLangPath = resource_path('lang');
+
+        // If the old location exists, use it (backward compatibility)
+        // This matches Laravel's behavior: prioritize old location if it exists
+        if (File::exists($oldLangPath)) {
+            return $oldLangPath;
+        }
+
+        // Use the new location (Laravel 9+)
+        return $newLangPath;
     }
 
     public function generateTranslationFiles(array $translationKeys, array $locales): bool

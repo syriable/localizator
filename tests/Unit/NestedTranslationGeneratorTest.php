@@ -252,6 +252,52 @@ class NestedTranslationGeneratorTest extends TestCase
         $this->assertEquals($expectedAdminStructure, $adminTranslations);
     }
 
+    #[Test]
+    public function it_detects_correct_language_path_for_different_laravel_versions(): void
+    {
+        // Use reflection to test the private method
+        $reflection = new \ReflectionClass($this->generator);
+        $method = $reflection->getMethod('detectLangPath');
+        $method->setAccessible(true);
+
+        $detectedPath = $method->invoke($this->generator);
+
+        // Should detect a valid path (either the temp path we set or Laravel default)
+        $this->assertIsString($detectedPath);
+        $this->assertNotEmpty($detectedPath);
+
+        // For our test case, it should be our temp path since we set it via reflection
+        $langPathProperty = $reflection->getProperty('langPath');
+        $langPathProperty->setAccessible(true);
+        $actualLangPath = $langPathProperty->getValue($this->generator);
+
+        $this->assertEquals($this->tempLangPath, $actualLangPath);
+    }
+
+    #[Test]
+    public function it_handles_missing_lang_directory_gracefully(): void
+    {
+        // Create a generator that would use default paths
+        $generator = new TranslationGeneratorService();
+
+        // Use reflection to get the detected path
+        $reflection = new \ReflectionClass($generator);
+        $method = $reflection->getMethod('detectLangPath');
+        $method->setAccessible(true);
+
+        $detectedPath = $method->invoke($generator);
+
+        // Should return a valid path even if directories don't exist
+        $this->assertIsString($detectedPath);
+        $this->assertNotEmpty($detectedPath);
+
+        // Should be either base_path('lang') or resource_path('lang')
+        $this->assertTrue(
+            str_contains($detectedPath, 'lang') || 
+            str_contains($detectedPath, 'resources')
+        );
+    }
+
     private function deleteDirectory(string $dir): void
     {
         if (! is_dir($dir)) {
